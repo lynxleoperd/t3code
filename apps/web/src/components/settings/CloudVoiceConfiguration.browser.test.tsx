@@ -28,8 +28,12 @@ vi.mock("../../state/environments", async (importOriginal) => ({
             },
           },
           environment: {
-            platform: { os: "linux", arch: "x64" },
-            capabilities: { voiceTranscription: true, cloudVoiceTranscription: true },
+            platform: { os: "macos", arch: "arm64" },
+            capabilities: {
+              voiceTranscription: true,
+              cloudVoiceTranscription: true,
+              antigravityVoiceTranscription: true,
+            },
           },
         },
       },
@@ -80,6 +84,26 @@ async function withVoicePanel(
     },
   );
 }
+
+it("groups signed-in accounts separately from API key providers", async () => {
+  chooseAudioDestination(null);
+  await withVoicePanel(
+    () => null,
+    async (screen) => {
+      await userEvent.click(screen.getByRole("combobox", { name: "Transcribe with" }));
+      const accounts = page.getByRole("group", { name: "Signed-in accounts via Laptop" });
+      const apiKeys = page.getByRole("group", { name: "API keys via Laptop" });
+      await expect
+        .element(accounts.getByRole("option", { name: "Antigravity via Laptop" }))
+        .toBeVisible();
+      expect(accounts.getByRole("option").elements()).toHaveLength(1);
+      await expect
+        .element(apiKeys.getByRole("option", { name: "OpenAI via Laptop" }))
+        .toBeVisible();
+      expect(apiKeys.getByRole("option").elements()).toHaveLength(3);
+    },
+  );
+});
 
 it("cancelling a provider's setup keeps the current destination and writes nothing", async () => {
   chooseAudioDestination({ kind: "environment", environmentId: id });

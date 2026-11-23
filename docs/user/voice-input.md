@@ -31,7 +31,19 @@ recording in a language can take longer while macOS downloads its speech model.
 filler-word removal are not available; the dictionary applies only when transcript
 cleanup is on.
 
-For cloud dictation, choose **OpenAI** or **Grok Voice Transcribe** via the environment
+### Signed-in accounts
+
+**Antigravity** is available in web and desktop when your environment runs on
+Apple Silicon macOS. Enable Antigravity and connect one personal Google account
+in **Settings → Providers**. In **Transcribe with**, find **Antigravity** under
+**Signed-in accounts** and confirm. T3 uses the existing Antigravity sign-in
+without an API key. The selected environment sends your recording to Google
+after you stop. Language detection is automatic, and T3 applies dictionary
+spellings after transcription.
+
+### API keys
+
+Under **API keys**, choose **OpenAI** or **Grok Voice Transcribe** via the environment
 you want to use. If it needs a key, enter one and choose **Save and enable**.
 You can also choose a [secret provider](secrets.md) instead of **Value** and enter a
 reference. Unlock the vault on that environment before dictating. Anyone with
@@ -53,13 +65,6 @@ dictation fails instead of switching models.
 Vocabulary hints are not sent to OpenRouter; dictionary spellings are applied
 after transcription. If OpenRouter stops listing your model, dictation stops
 until you choose another.
-
-**Antigravity** is available in web and desktop when your environment runs on
-Apple Silicon macOS. Enable Antigravity and connect one personal Google account
-in Settings → Providers, then choose **Antigravity** in **Transcribe with** and
-confirm. T3 uses the existing Antigravity sign-in without an API key. The
-selected environment sends your recording to Google after you stop. Language
-detection is automatic, and T3 applies dictionary spellings after transcription.
 
 ## Set up a model
 

@@ -17,7 +17,8 @@ import {
   AuthFilesystemReadScope,
   AuthSettingsWriteScope,
   CLOUD_SPEECH_LABELS,
-  CloudSpeechProvider,
+  CloudSpeechKeyProvider,
+  type CloudSpeechProvider,
   DEFAULT_SPEECH_POST_PROCESSING_PROMPT,
   type EnvironmentId,
   type EnvironmentSpeechModel,
@@ -1380,25 +1381,36 @@ export function VoiceSettingsPanel() {
     environment,
     value: JSON.stringify(["environment", environment.environmentId]),
   }));
-  const cloudGroups = environments
-    .filter(
-      (environment) => environment.serverConfig?.environment.capabilities.cloudVoiceTranscription,
-    )
-    .map((environment) => ({
+  const cloudGroups = environments.flatMap((environment) => {
+    const capabilities = environment.serverConfig?.environment.capabilities;
+    if (!capabilities?.cloudVoiceTranscription) return [];
+    const labels = { environment: environment.label };
+    const apiKeys = {
+      key: "api-keys",
+      label: gt("API keys via {environment}", labels),
+      providers: CloudSpeechKeyProvider.literals,
+    };
+    const groups = capabilities.antigravityVoiceTranscription
+      ? [
+          {
+            key: "signed-in",
+            label: gt("Signed-in accounts via {environment}", labels),
+            providers: ["antigravity"] as const,
+          },
+          apiKeys,
+        ]
+      : [apiKeys];
+    return groups.map(({ key, label, providers }) => ({
+      key: `${environment.environmentId}:${key}`,
       environment,
-      choices: CloudSpeechProvider.literals
-        .filter(
-          (provider) =>
-            provider !== "antigravity" ||
-            environment.serverConfig?.environment.capabilities.antigravityVoiceTranscription ===
-              true,
-        )
-        .map((provider) => ({
-          environment,
-          provider,
-          value: JSON.stringify(["cloud", environment.environmentId, provider]),
-        })),
+      label,
+      choices: providers.map((provider) => ({
+        environment,
+        provider,
+        value: JSON.stringify(["cloud", environment.environmentId, provider]),
+      })),
     }));
+  });
   const cloudChoices = cloudGroups.flatMap((group) => group.choices);
   const destinationValue = destination.device
     ? DEVICE
@@ -1619,13 +1631,9 @@ export function VoiceSettingsPanel() {
                       ))}
                     </SelectGroup>
                   )}
-                  {cloudGroups.map(({ environment, choices }) => (
-                    <SelectGroup key={environment.environmentId}>
-                      <SelectGroupLabel>
-                        <T>
-                          Cloud via <Var>{environment.label}</Var>
-                        </T>
-                      </SelectGroupLabel>
+                  {cloudGroups.map(({ environment, key, label, choices }) => (
+                    <SelectGroup key={key}>
+                      <SelectGroupLabel>{label}</SelectGroupLabel>
                       {choices.map(({ value, provider }) => (
                         <SelectItem
                           key={value}
