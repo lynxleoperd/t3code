@@ -155,7 +155,9 @@ function CloudSpeechLogo({ provider }: { provider: CloudSpeechProvider }) {
     return <ProviderPackageIcon icon={openRouterIcon} aria-hidden className="size-4 shrink-0" />;
   return (
     <ProviderInstanceIcon
-      driverKind={ProviderDriverKind.make(provider === "openai" ? "codex" : "grok")}
+      driverKind={ProviderDriverKind.make(
+        provider === "antigravity" ? provider : provider === "openai" ? "codex" : "grok",
+      )}
       displayName={CLOUD_SPEECH_LABELS[provider]}
       iconClassName="size-4"
     />
@@ -1384,11 +1386,18 @@ export function VoiceSettingsPanel() {
     )
     .map((environment) => ({
       environment,
-      choices: CloudSpeechProvider.literals.map((provider) => ({
-        environment,
-        provider,
-        value: JSON.stringify(["cloud", environment.environmentId, provider]),
-      })),
+      choices: CloudSpeechProvider.literals
+        .filter(
+          (provider) =>
+            provider !== "antigravity" ||
+            environment.serverConfig?.environment.capabilities.antigravityVoiceTranscription ===
+              true,
+        )
+        .map((provider) => ({
+          environment,
+          provider,
+          value: JSON.stringify(["cloud", environment.environmentId, provider]),
+        })),
     }));
   const cloudChoices = cloudGroups.flatMap((group) => group.choices);
   const destinationValue = destination.device
@@ -1412,6 +1421,9 @@ export function VoiceSettingsPanel() {
     chosenEnvironment?.serverConfig != null &&
     chosenEnvironment.serverConfig.environment.capabilities.voiceTranscription !== true;
   const model = prepared && modelStatus?.supported ? modelStatus : null;
+  const showLanguage =
+    destination.cloudProvider !== "antigravity" &&
+    (model || destination.cloudProvider || destination.device);
 
   return (
     <SettingsPageContainer
@@ -1640,6 +1652,7 @@ export function VoiceSettingsPanel() {
               </Select>
               {destination.cloudProvider &&
                 chosenEnvironment &&
+                destination.cloudProvider !== "antigravity" &&
                 (canManageKey || destination.cloudProvider === "openrouter") && (
                   <Tooltip>
                     <TooltipTrigger
@@ -1679,7 +1692,7 @@ export function VoiceSettingsPanel() {
             close={() => setPendingCloud(null)}
           />
         )}
-        {(model || destination.cloudProvider || destination.device) && (
+        {showLanguage && (
           <SettingsRow
             {...setting("speech-language")}
             title={gt("Language")}
@@ -1737,12 +1750,18 @@ export function VoiceSettingsPanel() {
               ? gt("Apple Speech handles silence itself.")
               : destination.cloudProvider === "openai"
                 ? gt("OpenAI handles silence itself.")
-                : gt("Skip silence and background noise before transcribing.")
+                : destination.cloudProvider === "antigravity"
+                  ? gt("Antigravity handles silence itself.")
+                  : gt("Skip silence and background noise before transcribing.")
           }
           control={
             <Switch
               aria-label={gt("Silence filtering")}
-              disabled={destination.device || destination.cloudProvider === "openai"}
+              disabled={
+                destination.device ||
+                destination.cloudProvider === "openai" ||
+                destination.cloudProvider === "antigravity"
+              }
               checked={settings.speechSilenceFiltering}
               onCheckedChange={(checked) =>
                 void updateClientSettings({ speechSilenceFiltering: checked })

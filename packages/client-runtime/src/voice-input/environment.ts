@@ -6,6 +6,8 @@ import { CloudSpeechError, SPEECH_STREAM_PATH } from "@t3tools/contracts";
 import type {
   CloudSpeechModelId,
   CloudSpeechProvider,
+  CloudSpeechKeyProvider,
+  ProviderInstanceId,
   EnvironmentSpeechModelDownload,
   SettingsSecretValue,
   SpeechAcceleration,
@@ -93,15 +95,23 @@ export const getCloudSpeechModels = (prepared: PreparedConnection) =>
 export const requireCloudSpeechKey = (
   prepared: PreparedConnection,
   provider: CloudSpeechProvider,
+  instanceId?: ProviderInstanceId,
 ) =>
   getCloudSpeechKeys(prepared).pipe(
     Effect.flatMap((keys) =>
-      keys[provider]
+      (
+        provider === "antigravity"
+          ? instanceId !== undefined && keys.antigravity === instanceId
+          : keys[provider]
+      )
         ? Effect.void
         : Effect.fail(
             new VoiceTranscriptionError({
               code: "unavailable",
-              message: new CloudSpeechError({ provider, reason: "missing-key" }).message,
+              message: new CloudSpeechError({
+                provider,
+                reason: provider === "antigravity" ? "account-unavailable" : "missing-key",
+              }).message,
             }),
           ),
     ),
@@ -109,7 +119,7 @@ export const requireCloudSpeechKey = (
 
 export const setCloudSpeechKey = (
   prepared: PreparedConnection,
-  provider: CloudSpeechProvider,
+  provider: CloudSpeechKeyProvider,
   key: SettingsSecretValue | null,
 ) =>
   request({
@@ -132,14 +142,18 @@ export const transcribeCloudPcm = (
   options: SpeechTranscriptionOptions,
   canSend: () => boolean,
   model?: CloudSpeechModelId,
+  instanceId?: ProviderInstanceId,
 ) => {
-  const query = model === undefined ? {} : { model };
+  const query = {
+    ...(model === undefined ? {} : { model }),
+    ...(instanceId === undefined ? {} : { instanceId }),
+  };
   return request({
     group: "voice",
     prepared,
     method: "POST",
     canSend,
-    timeoutMs: 130_000,
+    timeoutMs: provider === "antigravity" ? 370_000 : 130_000,
     path: (urls) => urls.transcribeCloud({ params: { provider }, query }),
     run: ({ client, headers }) =>
       client.transcribeCloud({

@@ -406,6 +406,12 @@ export const VoiceTranscriptionDestination = Schema.Union([
     provider: Schema.Literal("openrouter"),
     model: CloudSpeechModelId,
   }),
+  Schema.Struct({
+    kind: Schema.Literal("cloud"),
+    environmentId: EnvironmentId,
+    provider: Schema.Literal("antigravity"),
+    instanceId: ProviderInstanceId,
+  }),
 ]);
 export type VoiceTranscriptionDestination = typeof VoiceTranscriptionDestination.Type;
 

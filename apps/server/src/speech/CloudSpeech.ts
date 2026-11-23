@@ -8,6 +8,8 @@ import {
   type SecretReference,
   type ServerSettingsError,
   type CloudSpeechKeys,
+  type CloudSpeechKeyProvider,
+  type ProviderInstanceId,
   type CloudSpeechProvider,
   EnvironmentSpeechTranscriptionResult,
   type SpeechTranscriptionOptions,
@@ -18,11 +20,13 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 import * as ServerSettings from "../serverSettings.ts";
 import { requireSettingsSecret } from "../secrets/settingsSecretValue.ts";
+import { AntigravitySpeech } from "./AntigravitySpeech.ts";
 import { applySpeechAliases, speechRecognitionWords } from "./customWords.ts";
 import { removeSpeechFillerWords } from "./fillerWords.ts";
 import { decodeSpeechPcm, SpeechInvalidAudioError } from "./SpeechService.ts";
@@ -111,7 +115,7 @@ export class CloudSpeech extends Context.Service<
     /** OpenRouter's public transcription catalog, cached briefly on this server. */
     readonly models: Effect.Effect<ReadonlyArray<CloudSpeechModel>, CloudSpeechError>;
     readonly setKey: (
-      provider: CloudSpeechProvider,
+      provider: CloudSpeechKeyProvider,
       key: Redacted.Redacted<string> | SecretReference | null,
     ) => Effect.Effect<void, ServerSettingsError>;
     readonly transcribe: (
@@ -119,6 +123,7 @@ export class CloudSpeech extends Context.Service<
       pcm: Uint8Array,
       options: SpeechTranscriptionOptions,
       model?: string | undefined,
+      instanceId?: ProviderInstanceId | undefined,
     ) => Effect.Effect<string, CloudSpeechError | SpeechInvalidAudioError | ServerSettingsError>;
   }
 >()("t3/speech/CloudSpeech") {}
@@ -129,15 +134,21 @@ export const layer = Layer.effect(
     const settings = yield* ServerSettings.ServerSettingsService;
     const resolver = yield* SecretResolver.SecretResolver;
     const http = yield* HttpClient.HttpClient;
+    const antigravity = Option.getOrUndefined(yield* Effect.serviceOption(AntigravitySpeech));
     const credentials = settings.getSettings.pipe(
       Effect.map((value) => value.cloudSpeechCredentials),
     );
     const configured = credentials.pipe(
-      Effect.map(({ openai, xai, openrouter }) => ({
-        openai: Boolean(openai),
-        xai: Boolean(xai),
-        openrouter: Boolean(openrouter),
-      })),
+      Effect.flatMap(({ openai, xai, openrouter }) =>
+        (antigravity?.account ?? Effect.undefined).pipe(
+          Effect.map((account) => ({
+            openai: Boolean(openai),
+            xai: Boolean(xai),
+            openrouter: Boolean(openrouter),
+            ...(account === undefined ? {} : { antigravity: account }),
+          })),
+        ),
+      ),
     );
     const execute = (request: HttpClientRequest.HttpClientRequest) =>
       http
@@ -172,7 +183,7 @@ export const layer = Layer.effect(
       (exit) => (Exit.isSuccess(exit) ? "10 minutes" : 0),
     );
     const setKey = Effect.fn("CloudSpeech.setKey")(function* (
-      provider: CloudSpeechProvider,
+      provider: CloudSpeechKeyProvider,
       key: Redacted.Redacted<string> | SecretReference | null,
     ) {
       yield* settings.updateSettings({
@@ -187,19 +198,37 @@ export const layer = Layer.effect(
         pcm: Uint8Array,
         options: SpeechTranscriptionOptions,
         model?: string,
+        instanceId?: ProviderInstanceId,
       ) {
+        const decode = () =>
+          Effect.try({
+            try: () => decodeSpeechPcm(pcm),
+            catch: () =>
+              new SpeechInvalidAudioError({
+                byteLength: pcm.byteLength,
+                message: "Invalid PCM audio.",
+              }),
+          });
+        const postProcess = (text: string, language: string) => {
+          const corrected = applySpeechAliases(text, options.speechCustomWords);
+          return (
+            options.speechRemoveFillerWords
+              ? removeSpeechFillerWords(corrected, language, options.speechCorrectionWord)
+              : corrected
+          ).trim();
+        };
+        if (provider === "antigravity") {
+          if (!antigravity || !instanceId)
+            return yield* new CloudSpeechError({ provider, reason: "account-unavailable" });
+          const samples = yield* decode();
+          const text = yield* antigravity.transcribe(instanceId, Buffer.from(wave(samples), 44));
+          return postProcess(text, "auto");
+        }
         const source = (yield* credentials)[provider];
         if (!source) return yield* new CloudSpeechError({ provider, reason: "missing-key" });
         if (provider === "openrouter" && (!model || !isModelId(model)))
           return yield* new CloudSpeechError({ provider, reason: "model-unavailable" });
-        const samples = yield* Effect.try({
-          try: () => decodeSpeechPcm(pcm),
-          catch: () =>
-            new SpeechInvalidAudioError({
-              byteLength: pcm.byteLength,
-              message: "Invalid PCM audio.",
-            }),
-        });
+        const samples = yield* decode();
         const language = effectiveSpeechLanguage(cloudSpeechLanguages, options.speechLanguage);
         if (provider === "openrouter" && !(yield* models).some((entry) => entry.id === model))
           return yield* new CloudSpeechError({ provider, reason: "model-unavailable" });
@@ -241,17 +270,12 @@ export const layer = Layer.effect(
         const { text } = yield* HttpClientResponse.schemaBodyJson(
           EnvironmentSpeechTranscriptionResult,
         )(response).pipe(Effect.mapError(unavailable));
-        const corrected = applySpeechAliases(text, options.speechCustomWords);
-        return (
-          options.speechRemoveFillerWords
-            ? removeSpeechFillerWords(corrected, language, options.speechCorrectionWord)
-            : corrected
-        ).trim();
+        return postProcess(text, language);
       },
       (effect, provider) =>
         effect.pipe(
           Effect.timeoutOrElse({
-            duration: "2 minutes",
+            duration: provider === "antigravity" ? "6 minutes" : "2 minutes",
             orElse: () => Effect.fail(new CloudSpeechError({ provider, reason: "unavailable" })),
           }),
         ),

@@ -137,9 +137,14 @@ export function useVoiceTranscriptionDestination() {
   const cloud = grant?.destination.kind === "cloud" ? grant.destination : undefined;
   const provider = cloud?.provider;
   const model = cloud?.provider === "openrouter" ? cloud.model : undefined;
+  const instanceId = cloud?.provider === "antigravity" ? cloud.instanceId : undefined;
   const supported =
     environment?.serverConfig?.environment.capabilities[
-      provider ? "cloudVoiceTranscription" : "voiceTranscription"
+      provider === "antigravity"
+        ? "antigravityVoiceTranscription"
+        : provider
+          ? "cloudVoiceTranscription"
+          : "voiceTranscription"
     ] === true;
   return {
     ...(hydrated && choice === null ? { offerFirstRunSetup: true } : {}),
@@ -147,6 +152,7 @@ export function useVoiceTranscriptionDestination() {
     ...(device ? { device: true, onDevice: appleSpeechAvailable } : {}),
     ...(provider ? { cloudProvider: provider } : {}),
     ...(model ? { cloudModel: model } : {}),
+    ...(instanceId ? { cloudInstanceId: instanceId } : {}),
     grantId: grant?.id ?? null,
     label: device
       ? APPLE_SPEECH_LABEL
@@ -208,6 +214,7 @@ export function useEnvironmentSpeechInput(input: HookInput) {
     onDevice,
     cloudProvider,
     cloudModel,
+    cloudInstanceId: destination.cloudInstanceId,
   });
   const snapshot = useVoiceInputSessionSnapshot(session);
   const owns = snapshot.target?.ownerKey === input.ownerKey;

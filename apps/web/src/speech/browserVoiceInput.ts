@@ -16,6 +16,7 @@ import type {
   SpeechTranscriptionOptions,
   SpeechStreamText,
   EnvironmentSpeechStatus,
+  ProviderInstanceId,
 } from "@t3tools/contracts";
 import type { CloudSpeechModelId, CloudSpeechProvider } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
@@ -33,6 +34,7 @@ export function createBrowserVoiceInputPlatform(input: {
   readonly cloudProvider?: CloudSpeechProvider | undefined;
   /** The exact OpenRouter model the grant names; required with that provider. */
   readonly cloudModel?: CloudSpeechModelId | undefined;
+  readonly cloudInstanceId?: ProviderInstanceId | undefined;
   readonly hasAudioConsent: () => boolean;
   readonly getTranscriptionOptions: () => SpeechTranscriptionOptions;
   readonly getStatusListener?: () => ((status: EnvironmentSpeechStatus) => void) | undefined;
@@ -63,6 +65,7 @@ export function createBrowserVoiceInputPlatform(input: {
                 recordingOptions,
                 input.hasAudioConsent,
                 input.cloudModel,
+                input.cloudInstanceId,
               )
             : transcribeEnvironmentPcm(
                 input.prepared,
@@ -91,12 +94,15 @@ export function createBrowserVoiceInputPlatform(input: {
           message: m(msg("Choose an OpenRouter model in Settings → Voice.")),
         });
       await runEnvironmentSpeech(
-        requireCloudSpeechKey(input.prepared, input.cloudProvider),
+        requireCloudSpeechKey(input.prepared, input.cloudProvider, input.cloudInstanceId),
         options,
       );
       throwIfVoiceTranscriptionAborted(options.signal);
       return {
-        locale: effectiveSpeechLanguage(cloudSpeechLanguages, recordingOptions.speechLanguage),
+        locale:
+          input.cloudProvider === "antigravity"
+            ? "auto"
+            : effectiveSpeechLanguage(cloudSpeechLanguages, recordingOptions.speechLanguage),
         transcribe: transcribeRecording,
       };
     }

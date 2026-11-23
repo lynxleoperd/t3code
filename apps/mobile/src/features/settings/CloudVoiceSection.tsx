@@ -11,7 +11,7 @@ import {
   AuthSettingsWriteScope,
   CLOUD_SPEECH_LABELS,
   CLOUD_SPEECH_PROVIDER_NAMES,
-  CloudSpeechProvider,
+  CloudSpeechKeyProvider,
   CloudSpeechApiKey,
   CloudSpeechModelId,
   isSecretReference,
@@ -189,7 +189,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
   const reload = useAtomRefresh(cloudVoiceKeysAtom(id));
   const canManage = useEnvironmentScope(id, AuthSettingsWriteScope);
   const [editing, setEditing] = useState<{
-    provider: CloudSpeechProvider;
+    provider: CloudSpeechKeyProvider;
     enable: boolean;
   } | null>(null);
   const catalogAtom = cloudVoiceModelsAtom(editing?.provider === "openrouter" ? id : null);
@@ -222,7 +222,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
       );
     }
   };
-  const edit = (provider: CloudSpeechProvider, enable: boolean) => {
+  const edit = (provider: CloudSpeechKeyProvider, enable: boolean) => {
     const stored = environment.serverConfig?.settings.cloudSpeechCredentials?.[provider];
     const ref =
       isSecretReference(stored) && sources.some((candidate) => candidate.id === stored.provider)
@@ -239,7 +239,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
     setEditing(null);
   };
   const changeKey = async (
-    provider: CloudSpeechProvider,
+    provider: CloudSpeechKeyProvider,
     value: SettingsSecretValue | null,
     chosen?: CloudSpeechModelId,
   ) => {
@@ -290,7 +290,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
             environment: environment.label,
           })}
         >
-          {CloudSpeechProvider.literals.map((provider, index) => {
+          {CloudSpeechKeyProvider.literals.map((provider, index) => {
             const label = CLOUD_SPEECH_LABELS[provider];
             const routed = provider === "openrouter";
             const key = saved[provider];

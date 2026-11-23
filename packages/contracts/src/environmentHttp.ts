@@ -1,3 +1,4 @@
+import { ProviderInstanceId } from "./providerInstance.ts";
 import * as Context from "effect/Context";
 import type * as DateTime from "effect/DateTime";
 import * as Schema from "effect/Schema";
@@ -57,6 +58,7 @@ import {
   CloudSpeechApiKey,
   CloudSpeechError,
   CloudSpeechKeys,
+  CloudSpeechKeyProvider,
   CloudSpeechModelId,
   CloudSpeechModels,
   CloudSpeechProvider,
@@ -862,7 +864,7 @@ export class EnvironmentVoiceHttpApi extends HttpApiGroup.make("voice")
   .add(
     HttpApiEndpoint.post("setCloudKey", "/api/voice/cloud/:provider/key", {
       headers: OptionalBearerHeaders,
-      params: Schema.Struct({ provider: CloudSpeechProvider }),
+      params: Schema.Struct({ provider: CloudSpeechKeyProvider }),
       payload: Schema.Struct({
         key: Schema.NullOr(
           Schema.Union([Schema.RedactedFromValue(CloudSpeechApiKey), SecretReference]),
@@ -884,7 +886,10 @@ export class EnvironmentVoiceHttpApi extends HttpApiGroup.make("voice")
     HttpApiEndpoint.post("transcribeCloud", "/api/voice/cloud/:provider/transcribe", {
       headers: OptionalBearerHeaders,
       params: Schema.Struct({ provider: CloudSpeechProvider }),
-      query: Schema.Struct({ model: Schema.optionalKey(CloudSpeechModelId) }),
+      query: Schema.Struct({
+        model: Schema.optionalKey(CloudSpeechModelId),
+        instanceId: Schema.optionalKey(ProviderInstanceId),
+      }),
       payload: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array()),
       success: EnvironmentSpeechTranscriptionResult,
       error: [

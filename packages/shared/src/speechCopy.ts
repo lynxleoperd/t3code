@@ -8,6 +8,13 @@ export function cloudSpeechDisclosure(
   environment: string,
   resolve: MFunctionType = mFallback,
 ) {
+  if (provider === "antigravity")
+    return resolve(
+      msg(
+        "After you stop, {environment} sends your recording to Google using the connected Antigravity account.",
+        { environment },
+      ),
+    );
   return provider === "openrouter"
     ? resolve(
         msg(

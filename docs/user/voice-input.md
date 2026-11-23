@@ -54,6 +54,13 @@ Vocabulary hints are not sent to OpenRouter; dictionary spellings are applied
 after transcription. If OpenRouter stops listing your model, dictation stops
 until you choose another.
 
+**Antigravity** is available in web and desktop when your environment runs on
+Apple Silicon macOS. Enable Antigravity and connect one personal Google account
+in Settings → Providers, then choose **Antigravity** in **Transcribe with** and
+confirm. T3 uses the existing Antigravity sign-in without an API key. The
+selected environment sends your recording to Google after you stop. Language
+detection is automatic, and T3 applies dictionary spellings after transcription.
+
 ## Set up a model
 
 In **Settings → Voice → Transcription**, download a model and choose **Use model** if it

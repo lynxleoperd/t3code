@@ -4,7 +4,7 @@ import { m } from "../../i18n/messages";
 import {
   AuthOrchestrationOperateScope,
   type CloudSpeechModelId,
-  type CloudSpeechProvider,
+  type CloudSpeechKeyProvider,
   type EnvironmentId,
   DEFAULT_SPEECH_TRANSCRIPTION_OPTIONS,
   type VoiceTranscriptionDestination,
@@ -50,7 +50,7 @@ type CloudDestination = Extract<VoiceTranscriptionDestination, { kind: "cloud" }
 /** OpenRouter has no default model, so a cloud choice without one is no choice at all. */
 function cloudVoiceDestination(
   environmentId: EnvironmentId,
-  provider: CloudSpeechProvider,
+  provider: CloudSpeechKeyProvider,
   model?: CloudSpeechModelId,
 ): CloudDestination | null {
   if (provider === "openrouter")
@@ -60,7 +60,7 @@ function cloudVoiceDestination(
 
 export function chooseVoiceDestination(
   environmentId: EnvironmentId | null,
-  provider?: CloudSpeechProvider,
+  provider?: CloudSpeechKeyProvider,
   model?: CloudSpeechModelId,
 ) {
   choiceRevision++;
@@ -79,7 +79,7 @@ export function chooseVoiceDestination(
 
 export function pendingCloudVoiceChoice(
   id: EnvironmentId,
-  provider: CloudSpeechProvider,
+  provider: CloudSpeechKeyProvider,
   model?: CloudSpeechModelId,
 ) {
   const revision = ++choiceRevision;
@@ -145,11 +145,12 @@ function environmentTranscriber(
 ) {
   const provider = cloud?.provider;
   const model = cloud?.provider === "openrouter" ? cloud.model : undefined;
+  const instanceId = cloud?.provider === "antigravity" ? cloud.instanceId : undefined;
   return createEnvironmentTranscriber({
     canSend,
     prepare: async (signal) => {
       if (provider) {
-        await runSpeech(requireCloudSpeechKey(prepared, provider), signal, canSend);
+        await runSpeech(requireCloudSpeechKey(prepared, provider, instanceId), signal, canSend);
         return "auto";
       }
       const status = await runSpeech(getEnvironmentSpeechStatus(prepared), signal, canSend);
@@ -193,6 +194,7 @@ function environmentTranscriber(
                 DEFAULT_SPEECH_TRANSCRIPTION_OPTIONS,
                 canSend,
                 model,
+                instanceId,
               )
             : transcribeEnvironmentPcm(
                 prepared,

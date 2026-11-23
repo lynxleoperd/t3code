@@ -2,29 +2,38 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { ProviderInstanceId } from "./providerInstance.ts";
 
 export const CloudSpeechApiKey = TrimmedNonEmptyString.check(
   Schema.isMaxLength(4096),
   Schema.isPattern(/^(?![a-z][a-z\d+.-]*:\/\/)[!-~]+$/i),
 );
 
-export const CloudSpeechProvider = Schema.Literals(["openai", "xai", "openrouter"]);
+export const CloudSpeechKeyProvider = Schema.Literals(["openai", "xai", "openrouter"]);
+export type CloudSpeechKeyProvider = typeof CloudSpeechKeyProvider.Type;
+export const CloudSpeechProvider = Schema.Literals([
+  ...CloudSpeechKeyProvider.literals,
+  "antigravity",
+]);
 export type CloudSpeechProvider = typeof CloudSpeechProvider.Type;
 export const CLOUD_SPEECH_LABELS = {
   openai: "OpenAI",
   xai: "Grok Voice Transcribe",
   openrouter: "OpenRouter",
+  antigravity: "Antigravity",
 } as const;
 export const CLOUD_SPEECH_PROVIDER_NAMES = {
   openai: "OpenAI",
   xai: "xAI",
   openrouter: "OpenRouter",
+  antigravity: "Google",
 } as const;
 /** Servers that predate OpenRouter report only the first two providers. */
 export const CloudSpeechKeys = Schema.Struct({
   openai: Schema.Boolean,
   xai: Schema.Boolean,
   openrouter: Schema.optionalKey(Schema.Boolean),
+  antigravity: Schema.optionalKey(ProviderInstanceId),
 });
 export type CloudSpeechKeys = typeof CloudSpeechKeys.Type;
 
@@ -45,6 +54,7 @@ export class CloudSpeechError extends Schema.TaggedError<CloudSpeechError>()(
   {
     provider: CloudSpeechProvider,
     reason: Schema.Literals([
+      "account-unavailable",
       "missing-key",
       "key-changed",
       "unreadable-key",
@@ -59,6 +69,8 @@ export class CloudSpeechError extends Schema.TaggedError<CloudSpeechError>()(
   override get message() {
     const name = CLOUD_SPEECH_PROVIDER_NAMES[this.provider];
     switch (this.reason) {
+      case "account-unavailable":
+        return "Connect a personal Google account in Antigravity provider settings, then choose Antigravity in Settings → Voice.";
       case "missing-key":
         return `Add your ${name} API key in Settings → Voice.`;
       case "key-changed":

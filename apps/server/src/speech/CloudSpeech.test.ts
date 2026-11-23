@@ -1,5 +1,10 @@
 import { it } from "@effect/vitest";
-import { DEFAULT_SPEECH_TRANSCRIPTION_OPTIONS, SecretProviderId } from "@t3tools/contracts";
+import {
+  CloudSpeechError,
+  DEFAULT_SPEECH_TRANSCRIPTION_OPTIONS,
+  ProviderInstanceId,
+  SecretProviderId,
+} from "@t3tools/contracts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -8,6 +13,7 @@ import * as Redacted from "effect/Redacted";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import { expect, vi } from "vite-plus/test";
 import * as ServerSettings from "../serverSettings.ts";
+import { AntigravitySpeech } from "./AntigravitySpeech.ts";
 import * as CloudSpeech from "./CloudSpeech.ts";
 
 it.effect.each(["openai", "xai"] as const)("sends only to %s using its own saved key", (provider) =>
@@ -203,5 +209,58 @@ it.effect("removing a key while a catalog read is pending prevents the upload", 
     const exit = yield* Fiber.await(job);
     expect(uploads).toEqual([]);
     expect(exit._tag).toBe("Failure");
+  }),
+);
+
+it.effect("relays Antigravity speech as PCM using the consented account and no key", () =>
+  Effect.gen(function* () {
+    const account = ProviderInstanceId.make("antigravity");
+    const transcribe = vi.fn((instanceId: ProviderInstanceId | undefined, _recording: Buffer) =>
+      instanceId === account
+        ? Effect.succeed("Test t three code.")
+        : Effect.fail(
+            new CloudSpeechError({ provider: "antigravity", reason: "account-unavailable" }),
+          ),
+    );
+    const upstream = vi.fn<typeof fetch>();
+    const service = yield* CloudSpeech.CloudSpeech.pipe(
+      Effect.provide(
+        CloudSpeech.layer.pipe(
+          Layer.provide(FetchHttpClient.layer),
+          Layer.provide(ServerSettings.ServerSettingsService.layerTest()),
+          Layer.provide(Layer.mock(SecretResolver.SecretResolver)({})),
+          Layer.provide(
+            Layer.succeed(
+              AntigravitySpeech,
+              AntigravitySpeech.of({ account: Effect.succeed(account), transcribe }),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(yield* service.configured).toEqual({
+      openai: false,
+      xai: false,
+      openrouter: false,
+      antigravity: account,
+    });
+    const record = (instanceId?: ProviderInstanceId) =>
+      service
+        .transcribe(
+          "antigravity",
+          new Uint8Array(new Float32Array([0, 0.5, -0.5]).buffer),
+          {
+            ...DEFAULT_SPEECH_TRANSCRIPTION_OPTIONS,
+            speechCustomWords: [{ term: "T3 Code", aliases: ["t three code"] }],
+          },
+          undefined,
+          instanceId,
+        )
+        .pipe(Effect.provideService(FetchHttpClient.Fetch, upstream));
+    expect((yield* Effect.flip(record()))._tag).toBe("CloudSpeechError");
+    expect(transcribe).not.toHaveBeenCalled();
+    expect(yield* record(account)).toBe("Test T3 Code.");
+    expect(transcribe).toHaveBeenCalledWith(account, Buffer.from([0, 0, 0, 64, 0, 192]));
+    expect(upstream).not.toHaveBeenCalled();
   }),
 );

@@ -14,6 +14,7 @@ import type {
   ClientSettings,
   EnvironmentId,
   EnvironmentSpeechStatus,
+  ProviderInstanceId,
   SpeechCustomWords,
   SpeechPostProcessingOptions,
   SpeechStreamText,
@@ -84,6 +85,7 @@ type SessionKey = {
   readonly grantId: string;
   readonly cloudProvider: CloudSpeechProvider | undefined;
   readonly cloudModel: CloudSpeechModelId | undefined;
+  readonly cloudInstanceId?: ProviderInstanceId | undefined;
 };
 
 const SILENT_ACTIVITY: VoiceInputSessionActivity = { level: 0, preview: null };
@@ -186,6 +188,7 @@ export class VoiceInputSession {
           prepared: key.prepared,
           cloudProvider: key.cloudProvider,
           cloudModel: key.cloudModel,
+          cloudInstanceId: key.cloudInstanceId,
           onText: (preview) => {
             if (!this.disposed) this.publishActivity({ ...this.activity, preview });
           },
@@ -382,7 +385,8 @@ function sameKey(session: VoiceInputSession, key: SessionKey): boolean {
     session.key.prepared === key.prepared &&
     session.key.grantId === key.grantId &&
     session.key.cloudProvider === key.cloudProvider &&
-    session.key.cloudModel === key.cloudModel
+    session.key.cloudModel === key.cloudModel &&
+    session.key.cloudInstanceId === key.cloudInstanceId
   );
 }
 
@@ -423,17 +427,26 @@ export function useRetainedVoiceInputSession(input: {
   readonly onDevice?: boolean | undefined;
   readonly cloudProvider?: CloudSpeechProvider | undefined;
   readonly cloudModel?: CloudSpeechModelId | undefined;
+  readonly cloudInstanceId?: ProviderInstanceId | undefined;
 }): VoiceInputSession | null {
-  const { grantId, cloudProvider, cloudModel } = input;
+  const { grantId, cloudProvider, cloudModel, cloudInstanceId } = input;
   const prepared = input.onDevice ? null : input.prepared;
   const ready = (input.onDevice === true || prepared !== null) && grantId !== null;
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- retains the shared recording session for this destination while mounted
   useEffect(() => {
     if (!ready || !grantId || typeof navigator === "undefined") return;
-    return retainVoiceInputSession({ prepared, grantId, cloudProvider, cloudModel });
-  }, [ready, prepared, grantId, cloudProvider, cloudModel]);
+    return retainVoiceInputSession({
+      prepared,
+      grantId,
+      cloudProvider,
+      cloudModel,
+      cloudInstanceId,
+    });
+  }, [ready, prepared, grantId, cloudProvider, cloudModel, cloudInstanceId]);
   return useSyncExternalStore(subscribeRegistry, () =>
-    ready && grantId ? findSession({ prepared, grantId, cloudProvider, cloudModel }) : null,
+    ready && grantId
+      ? findSession({ prepared, grantId, cloudProvider, cloudModel, cloudInstanceId })
+      : null,
   );
 }
 

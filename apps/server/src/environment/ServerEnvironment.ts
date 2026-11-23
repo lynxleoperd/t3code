@@ -1,3 +1,4 @@
+import { supportsAntigravitySpeech } from "../speech/AntigravitySpeech.ts";
 import {
   EnvironmentId,
   ORCHESTRATION_PROTOCOL_VERSION,
@@ -287,6 +288,9 @@ export const make = Effect.gen(function* () {
       npmReleaseLookup: true,
       voiceTranscription: isSpeechPlatformSupported(hostPlatform, hostArchitecture, hostLibc),
       cloudVoiceTranscription: true,
+      ...(supportsAntigravitySpeech(hostPlatform, hostArchitecture)
+        ? { antigravityVoiceTranscription: true }
+        : {}),
       ...(serverSelfUpdate === null ? {} : { serverSelfUpdate }),
       ...(serverInstallation === null ? {} : { serverInstallation }),
       ...(serverSelfUpdate === "boot-service" || desktopAppUpdate
