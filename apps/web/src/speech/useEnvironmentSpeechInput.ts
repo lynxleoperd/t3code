@@ -137,14 +137,16 @@ export function useVoiceTranscriptionDestination() {
   const cloud = grant?.destination.kind === "cloud" ? grant.destination : undefined;
   const provider = cloud?.provider;
   const model = cloud?.provider === "openrouter" ? cloud.model : undefined;
-  const instanceId = cloud?.provider === "antigravity" ? cloud.instanceId : undefined;
+  const instanceId = cloud && "instanceId" in cloud ? cloud.instanceId : undefined;
   const supported =
     environment?.serverConfig?.environment.capabilities[
       provider === "antigravity"
         ? "antigravityVoiceTranscription"
-        : provider
-          ? "cloudVoiceTranscription"
-          : "voiceTranscription"
+        : provider === "codex"
+          ? "codexVoiceTranscription"
+          : provider
+            ? "cloudVoiceTranscription"
+            : "voiceTranscription"
     ] === true;
   return {
     ...(hydrated && choice === null ? { offerFirstRunSetup: true } : {}),

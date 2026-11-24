@@ -55,6 +55,7 @@ import {
 } from "./providerInstance.ts";
 import { PullRequestMergeMethod } from "./pullRequest.ts";
 import {
+  CloudSpeechAccountProvider,
   CloudSpeechModelId,
   SpeechAcceleration,
   SpeechCorrectionCue,
@@ -409,7 +410,7 @@ export const VoiceTranscriptionDestination = Schema.Union([
   Schema.Struct({
     kind: Schema.Literal("cloud"),
     environmentId: EnvironmentId,
-    provider: Schema.Literal("antigravity"),
+    provider: CloudSpeechAccountProvider,
     instanceId: ProviderInstanceId,
   }),
 ]);

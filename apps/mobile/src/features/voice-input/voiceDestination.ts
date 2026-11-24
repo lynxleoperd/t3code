@@ -145,7 +145,7 @@ function environmentTranscriber(
 ) {
   const provider = cloud?.provider;
   const model = cloud?.provider === "openrouter" ? cloud.model : undefined;
-  const instanceId = cloud?.provider === "antigravity" ? cloud.instanceId : undefined;
+  const instanceId = cloud && "instanceId" in cloud ? cloud.instanceId : undefined;
   return createEnvironmentTranscriber({
     canSend,
     prepare: async (signal) => {

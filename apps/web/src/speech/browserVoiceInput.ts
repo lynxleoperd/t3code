@@ -18,7 +18,11 @@ import type {
   EnvironmentSpeechStatus,
   ProviderInstanceId,
 } from "@t3tools/contracts";
-import type { CloudSpeechModelId, CloudSpeechProvider } from "@t3tools/contracts";
+import {
+  isCloudSpeechAccountProvider,
+  type CloudSpeechModelId,
+  type CloudSpeechProvider,
+} from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 
 import { readAppleSpeechLocales, resolveAppleSpeechLocale } from "./appleSpeech";
@@ -99,10 +103,9 @@ export function createBrowserVoiceInputPlatform(input: {
       );
       throwIfVoiceTranscriptionAborted(options.signal);
       return {
-        locale:
-          input.cloudProvider === "antigravity"
-            ? "auto"
-            : effectiveSpeechLanguage(cloudSpeechLanguages, recordingOptions.speechLanguage),
+        locale: isCloudSpeechAccountProvider(input.cloudProvider)
+          ? "auto"
+          : effectiveSpeechLanguage(cloudSpeechLanguages, recordingOptions.speechLanguage),
         transcribe: transcribeRecording,
       };
     }

@@ -41,6 +41,12 @@ without an API key. The selected environment sends your recording to Google
 after you stop. Language detection is automatic, and T3 applies dictionary
 spellings after transcription.
 
+**Codex** uses one file-backed ChatGPT sign-in configured for an enabled Codex
+provider on the selected environment. Choose **Codex** under **Signed-in
+accounts** and confirm. The environment sends the audio to ChatGPT, then adds
+the text to your draft. This experimental option depends on an undocumented
+ChatGPT transcription endpoint.
+
 ### API keys
 
 Under **API keys**, choose **OpenAI** or **Grok Voice Transcribe** via the environment

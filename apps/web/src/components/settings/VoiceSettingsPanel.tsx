@@ -17,7 +17,9 @@ import {
   AuthFilesystemReadScope,
   AuthSettingsWriteScope,
   CLOUD_SPEECH_LABELS,
+  CloudSpeechAccountProvider,
   CloudSpeechKeyProvider,
+  isCloudSpeechAccountProvider,
   type CloudSpeechProvider,
   DEFAULT_SPEECH_POST_PROCESSING_PROMPT,
   type EnvironmentId,
@@ -157,7 +159,11 @@ function CloudSpeechLogo({ provider }: { provider: CloudSpeechProvider }) {
   return (
     <ProviderInstanceIcon
       driverKind={ProviderDriverKind.make(
-        provider === "antigravity" ? provider : provider === "openai" ? "codex" : "grok",
+        isCloudSpeechAccountProvider(provider)
+          ? provider
+          : provider === "openai"
+            ? "codex"
+            : "grok",
       )}
       displayName={CLOUD_SPEECH_LABELS[provider]}
       iconClassName="size-4"
@@ -1390,16 +1396,22 @@ export function VoiceSettingsPanel() {
       label: gt("API keys via {environment}", labels),
       providers: CloudSpeechKeyProvider.literals,
     };
-    const groups = capabilities.antigravityVoiceTranscription
-      ? [
-          {
-            key: "signed-in",
-            label: gt("Signed-in accounts via {environment}", labels),
-            providers: ["antigravity"] as const,
-          },
-          apiKeys,
-        ]
-      : [apiKeys];
+    const signedInProviders = CloudSpeechAccountProvider.literals.filter((provider) =>
+      provider === "antigravity"
+        ? capabilities.antigravityVoiceTranscription
+        : capabilities.codexVoiceTranscription,
+    );
+    const groups =
+      signedInProviders.length > 0
+        ? [
+            {
+              key: "signed-in",
+              label: gt("Signed-in accounts via {environment}", labels),
+              providers: signedInProviders,
+            },
+            apiKeys,
+          ]
+        : [apiKeys];
     return groups.map(({ key, label, providers }) => ({
       key: `${environment.environmentId}:${key}`,
       environment,
@@ -1433,9 +1445,12 @@ export function VoiceSettingsPanel() {
     chosenEnvironment?.serverConfig != null &&
     chosenEnvironment.serverConfig.environment.capabilities.voiceTranscription !== true;
   const model = prepared && modelStatus?.supported ? modelStatus : null;
+  const signedInProvider =
+    destination.cloudProvider && isCloudSpeechAccountProvider(destination.cloudProvider)
+      ? destination.cloudProvider
+      : undefined;
   const showLanguage =
-    destination.cloudProvider !== "antigravity" &&
-    (model || destination.cloudProvider || destination.device);
+    !signedInProvider && (model || destination.cloudProvider || destination.device);
 
   return (
     <SettingsPageContainer
@@ -1660,7 +1675,7 @@ export function VoiceSettingsPanel() {
               </Select>
               {destination.cloudProvider &&
                 chosenEnvironment &&
-                destination.cloudProvider !== "antigravity" &&
+                !isCloudSpeechAccountProvider(destination.cloudProvider) &&
                 (canManageKey || destination.cloudProvider === "openrouter") && (
                   <Tooltip>
                     <TooltipTrigger
@@ -1758,17 +1773,17 @@ export function VoiceSettingsPanel() {
               ? gt("Apple Speech handles silence itself.")
               : destination.cloudProvider === "openai"
                 ? gt("OpenAI handles silence itself.")
-                : destination.cloudProvider === "antigravity"
-                  ? gt("Antigravity handles silence itself.")
+                : signedInProvider
+                  ? gt("{provider} handles silence itself.", {
+                      provider: CLOUD_SPEECH_LABELS[signedInProvider],
+                    })
                   : gt("Skip silence and background noise before transcribing.")
           }
           control={
             <Switch
               aria-label={gt("Silence filtering")}
               disabled={
-                destination.device ||
-                destination.cloudProvider === "openai" ||
-                destination.cloudProvider === "antigravity"
+                destination.device || destination.cloudProvider === "openai" || !!signedInProvider
               }
               checked={settings.speechSilenceFiltering}
               onCheckedChange={(checked) =>

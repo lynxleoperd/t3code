@@ -27,6 +27,7 @@ import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } fr
 import * as ServerSettings from "../serverSettings.ts";
 import { requireSettingsSecret } from "../secrets/settingsSecretValue.ts";
 import { AntigravitySpeech } from "./AntigravitySpeech.ts";
+import { CodexSpeech } from "./CodexSpeech.ts";
 import { applySpeechAliases, speechRecognitionWords } from "./customWords.ts";
 import { removeSpeechFillerWords } from "./fillerWords.ts";
 import { decodeSpeechPcm, SpeechInvalidAudioError } from "./SpeechService.ts";
@@ -135,17 +136,22 @@ export const layer = Layer.effect(
     const resolver = yield* SecretResolver.SecretResolver;
     const http = yield* HttpClient.HttpClient;
     const antigravity = Option.getOrUndefined(yield* Effect.serviceOption(AntigravitySpeech));
+    const codex = Option.getOrUndefined(yield* Effect.serviceOption(CodexSpeech));
     const credentials = settings.getSettings.pipe(
       Effect.map((value) => value.cloudSpeechCredentials),
     );
     const configured = credentials.pipe(
       Effect.flatMap(({ openai, xai, openrouter }) =>
-        (antigravity?.account ?? Effect.undefined).pipe(
-          Effect.map((account) => ({
+        Effect.all({
+          antigravity: antigravity?.account ?? Effect.undefined,
+          codex: codex?.account ?? Effect.undefined,
+        }).pipe(
+          Effect.map((accounts) => ({
             openai: Boolean(openai),
             xai: Boolean(xai),
             openrouter: Boolean(openrouter),
-            ...(account === undefined ? {} : { antigravity: account }),
+            ...(accounts.antigravity === undefined ? {} : { antigravity: accounts.antigravity }),
+            ...(accounts.codex === undefined ? {} : { codex: accounts.codex }),
           })),
         ),
       ),
@@ -223,6 +229,13 @@ export const layer = Layer.effect(
           const samples = yield* decode();
           const text = yield* antigravity.transcribe(instanceId, Buffer.from(wave(samples), 44));
           return postProcess(text, "auto");
+        }
+        if (provider === "codex") {
+          if (!codex || !instanceId)
+            return yield* new CloudSpeechError({ provider, reason: "account-unavailable" });
+          const samples = yield* decode();
+          if (samples.every((sample) => sample === 0)) return "";
+          return postProcess(yield* codex.transcribe(instanceId, wave(samples)), "auto");
         }
         const source = (yield* credentials)[provider];
         if (!source) return yield* new CloudSpeechError({ provider, reason: "missing-key" });

@@ -288,6 +288,7 @@ export const make = Effect.gen(function* () {
       npmReleaseLookup: true,
       voiceTranscription: isSpeechPlatformSupported(hostPlatform, hostArchitecture, hostLibc),
       cloudVoiceTranscription: true,
+      codexVoiceTranscription: true,
       ...(supportsAntigravitySpeech(hostPlatform, hostArchitecture)
         ? { antigravityVoiceTranscription: true }
         : {}),

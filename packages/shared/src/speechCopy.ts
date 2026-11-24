@@ -8,6 +8,13 @@ export function cloudSpeechDisclosure(
   environment: string,
   resolve: MFunctionType = mFallback,
 ) {
+  if (provider === "codex")
+    return resolve(
+      msg(
+        "After you stop, {environment} sends your recording to ChatGPT using the connected Codex account. This integration is experimental.",
+        { environment },
+      ),
+    );
   if (provider === "antigravity")
     return resolve(
       msg(

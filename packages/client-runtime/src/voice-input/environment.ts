@@ -2,7 +2,11 @@ import { encodeSpeechPcmRequest } from "@t3tools/shared/speech";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-import { CloudSpeechError, SPEECH_STREAM_PATH } from "@t3tools/contracts";
+import {
+  CloudSpeechError,
+  isCloudSpeechAccountProvider,
+  SPEECH_STREAM_PATH,
+} from "@t3tools/contracts";
 import type {
   CloudSpeechModelId,
   CloudSpeechProvider,
@@ -100,8 +104,8 @@ export const requireCloudSpeechKey = (
   getCloudSpeechKeys(prepared).pipe(
     Effect.flatMap((keys) =>
       (
-        provider === "antigravity"
-          ? instanceId !== undefined && keys.antigravity === instanceId
+        isCloudSpeechAccountProvider(provider)
+          ? instanceId !== undefined && keys[provider] === instanceId
           : keys[provider]
       )
         ? Effect.void
@@ -110,7 +114,9 @@ export const requireCloudSpeechKey = (
               code: "unavailable",
               message: new CloudSpeechError({
                 provider,
-                reason: provider === "antigravity" ? "account-unavailable" : "missing-key",
+                reason: isCloudSpeechAccountProvider(provider)
+                  ? "account-unavailable"
+                  : "missing-key",
               }).message,
             }),
           ),

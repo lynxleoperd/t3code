@@ -18,7 +18,9 @@ import {
   CloudSpeechModelId,
   CLOUD_SPEECH_LABELS,
   CLOUD_SPEECH_PROVIDER_NAMES,
+  isCloudSpeechAccountProvider,
   isSecretReference,
+  type CloudSpeechAccountProvider,
   type CloudSpeechModel,
   type CloudSpeechProvider,
   type CloudSpeechKeyProvider,
@@ -164,24 +166,26 @@ type ConfigurationProps = {
 };
 
 export function CloudVoiceConfiguration({ provider, ...props }: ConfigurationProps) {
-  return provider === "antigravity" ? (
-    <AntigravityVoiceConfiguration {...props} />
+  return isCloudSpeechAccountProvider(provider) ? (
+    <SignedInVoiceConfiguration {...props} provider={provider} />
   ) : (
     <CloudKeyVoiceConfiguration {...props} provider={provider} />
   );
 }
 
-function AntigravityVoiceConfiguration({
+function SignedInVoiceConfiguration({
   environment,
+  provider,
   close,
-}: Omit<ConfigurationProps, "provider">) {
+}: Omit<ConfigurationProps, "provider"> & { provider: CloudSpeechAccountProvider }) {
   const messages = useMessages();
   const gt = useGT();
   const id = environment.environmentId;
   const prepared = Option.getOrNull(usePreparedConnection(id));
   const canUse = useEnvironmentScope(id, AuthOrchestrationOperateScope);
   const [presence, refresh] = useCloudRead(canUse ? prepared : null, getCloudSpeechKeys);
-  const instanceId = AsyncResult.isSuccess(presence) ? presence.value?.antigravity : undefined;
+  const instanceId = AsyncResult.isSuccess(presence) ? presence.value?.[provider] : undefined;
+  const name = CLOUD_SPEECH_LABELS[provider];
   return (
     <Dialog
       open
@@ -191,11 +195,9 @@ function AntigravityVoiceConfiguration({
     >
       <DialogPopup className="max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            <T>Use Antigravity for dictation?</T>
-          </DialogTitle>
+          <DialogTitle>{gt("Use {name} for dictation?", { name })}</DialogTitle>
           <DialogDescription>
-            {cloudSpeechDisclosure("antigravity", environment.label, messages)}
+            {cloudSpeechDisclosure(provider, environment.label, messages)}
           </DialogDescription>
         </DialogHeader>
         {!instanceId && (
@@ -206,12 +208,16 @@ function AntigravityVoiceConfiguration({
                     environment: environment.label,
                   })
                 : AsyncResult.isFailure(presence)
-                  ? gt("Couldn’t check the Antigravity account.")
+                  ? gt("Couldn’t check the {name} account.", { name })
                   : AsyncResult.isSuccess(presence)
-                    ? gt(
-                        "Connect one personal Google account in Antigravity provider settings to use dictation.",
-                      )
-                    : gt("Checking the Antigravity account…")}
+                    ? provider === "codex"
+                      ? gt(
+                          "Sign in to one Codex provider with a file-backed ChatGPT account to use dictation.",
+                        )
+                      : gt(
+                          "Connect one personal Google account in Antigravity provider settings to use dictation.",
+                        )
+                    : gt("Checking the {name} account…", { name })}
             </p>
           </DialogPanel>
         )}
@@ -233,13 +239,13 @@ function AntigravityVoiceConfiguration({
                 chooseAudioDestination({
                   kind: "cloud",
                   environmentId: id,
-                  provider: "antigravity",
+                  provider,
                   instanceId,
                 });
                 close();
               }}
             >
-              <T>Use Antigravity</T>
+              {gt("Use {name}", { name })}
             </Button>
           )}
         </DialogFooter>

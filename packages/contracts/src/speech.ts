@@ -11,9 +11,12 @@ export const CloudSpeechApiKey = TrimmedNonEmptyString.check(
 
 export const CloudSpeechKeyProvider = Schema.Literals(["openai", "xai", "openrouter"]);
 export type CloudSpeechKeyProvider = typeof CloudSpeechKeyProvider.Type;
+export const CloudSpeechAccountProvider = Schema.Literals(["antigravity", "codex"]);
+export type CloudSpeechAccountProvider = typeof CloudSpeechAccountProvider.Type;
+export const isCloudSpeechAccountProvider = Schema.is(CloudSpeechAccountProvider);
 export const CloudSpeechProvider = Schema.Literals([
   ...CloudSpeechKeyProvider.literals,
-  "antigravity",
+  ...CloudSpeechAccountProvider.literals,
 ]);
 export type CloudSpeechProvider = typeof CloudSpeechProvider.Type;
 export const CLOUD_SPEECH_LABELS = {
@@ -21,12 +24,14 @@ export const CLOUD_SPEECH_LABELS = {
   xai: "Grok Voice Transcribe",
   openrouter: "OpenRouter",
   antigravity: "Antigravity",
+  codex: "Codex",
 } as const;
 export const CLOUD_SPEECH_PROVIDER_NAMES = {
   openai: "OpenAI",
   xai: "xAI",
   openrouter: "OpenRouter",
   antigravity: "Google",
+  codex: "ChatGPT",
 } as const;
 /** Servers that predate OpenRouter report only the first two providers. */
 export const CloudSpeechKeys = Schema.Struct({
@@ -34,6 +39,7 @@ export const CloudSpeechKeys = Schema.Struct({
   xai: Schema.Boolean,
   openrouter: Schema.optionalKey(Schema.Boolean),
   antigravity: Schema.optionalKey(ProviderInstanceId),
+  codex: Schema.optionalKey(ProviderInstanceId),
 });
 export type CloudSpeechKeys = typeof CloudSpeechKeys.Type;
 
@@ -70,6 +76,8 @@ export class CloudSpeechError extends Schema.TaggedError<CloudSpeechError>()(
     const name = CLOUD_SPEECH_PROVIDER_NAMES[this.provider];
     switch (this.reason) {
       case "account-unavailable":
+        if (this.provider === "codex")
+          return "Sign in to one Codex provider with a file-backed ChatGPT account, then choose Codex in Settings → Voice.";
         return "Connect a personal Google account in Antigravity provider settings, then choose Antigravity in Settings → Voice.";
       case "missing-key":
         return `Add your ${name} API key in Settings → Voice.`;
